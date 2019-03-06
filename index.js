@@ -24,7 +24,9 @@ class WakeOnLanAdapter extends Adapter {
     super(addonManager, manifest.name, manifest.name);
     addonManager.addAdapter(this);
 
-    this.checkPing = manifest.moziot.config.checkPing || true;
+    this.checkPing = manifest.moziot.config.hasOwnProperty('checkPing') ?
+      manifest.moziot.config.checkPing :
+      true;
 
     findDevices()
       .catch(console.warn)
