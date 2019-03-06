@@ -6,18 +6,34 @@ const findDevices = require('local-devices');
 const {promise: ping} = require('ping');
 
 class WakeOnLanAdapter extends Adapter {
+  static getDeviceInfoFromArpTable(mac, arpDevices = []) {
+    const normalizedMac = mac.toLowerCase();
+    const arpDevice = arpDevices.find((d) => d.mac.toLowerCase() === normalizedMac);
+    if (arpDevice) {
+      // de-normalize mac so device ID stays the same.
+      arpDevice.mac = mac;
+      return arpDevice;
+    }
+    return {
+      mac: mac,
+      name: '?',
+    };
+  }
+
   constructor(addonManager, manifest) {
     super(addonManager, manifest.name, manifest.name);
     addonManager.addAdapter(this);
 
-    this.checkPing = manifest.moziot.config.checkPing || false;
+    this.checkPing = manifest.moziot.config.checkPing || true;
 
-    findDevices().then((devices) => {
-      for (const mac of manifest.moziot.config.devices) {
-        const arpDevice = devices.find((d) => d.mac === mac.toLowerCase());
-        this.addDevice(arpDevice);
-      }
-    });
+    findDevices()
+      .catch(console.warn)
+      .then((devices) => {
+        for (const mac of manifest.moziot.config.devices) {
+          const arpDevice = WakeOnLanAdapter.getDeviceInfoFromArpTable(mac, devices);
+          this.addDevice(arpDevice);
+        }
+      });
 
     if (this.checkPing && manifest.moziot.config.devices) {
       this.startPingChecker();
@@ -30,7 +46,9 @@ class WakeOnLanAdapter extends Adapter {
     if (this.devices.hasOwnProperty(wolDevice.id)) {
       return;
     }
-    wolDevice.checkPing(arpDevice.ip);
+    if (arpDevice.ip) {
+      wolDevice.checkPing(arpDevice.ip);
+    }
     this.handleDeviceAdded(wolDevice);
   }
 
@@ -52,9 +70,13 @@ class WakeOnLanAdapter extends Adapter {
     this.interval = setInterval(async () => {
       const devices = await findDevices();
       for (const device of Object.values(this.devices)) {
-        const info = devices.find((d) => d.mac === device.mac.toLowerCase());
+        const normalizedMac = device.mac.toLowerCase();
+        const info = devices.find((d) => d.mac.toLowerCase() === normalizedMac);
         if (info) {
           device.checkPing(info.ip);
+        } else {
+          // Not in ARP table, so as far as we know the device is not in the network.
+          device.setOn(false);
         }
       }
     }, 30000);
@@ -87,7 +109,7 @@ class WakeOnLanDevice extends Device {
     if (adapter.checkPing) {
       this.properties.set('on', new PingProperty(this, 'on', {
         type: 'boolean',
-        label: 'In Network',
+        label: 'Awake',
       }, false));
     }
   }

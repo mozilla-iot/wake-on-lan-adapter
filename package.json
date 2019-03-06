@@ -47,7 +47,8 @@
     "plugin": true,
     "exec": "{nodeLoader} {path}",
     "config": {
-      "devices": []
+      "devices": [],
+      "checkPing": true
     },
     "schema": {
       "type": "object",
