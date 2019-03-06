@@ -35,7 +35,7 @@ class WakeOnLanAdapter extends Adapter {
         }
       });
 
-    if (this.checkPing && manifest.moziot.config.devices) {
+    if (this.checkPing && manifest.moziot.config.devices.length) {
       this.startPingChecker();
     }
   }
